@@ -1,0 +1,41 @@
+# --- Running automated checks ---
+# Checking registers 1..31 and selected memory locations...
+# PASS: r1 == 0x00000007
+# FAIL: r2 expected 0x00000015 observed 0x00000008
+# FAIL: r3 expected 0xfffffffb observed 0xfffffffe
+# FAIL: r4 expected 0x00000000 observed 0x00000003
+# FAIL: r5 was never observed written (observed value 0x00000000)
+# FAIL: r6 was never observed written (observed value 0x00000000)
+# FAIL: r7 was never observed written (observed value 0x00000000)
+# FAIL: r8 was never observed written (observed value 0x00000000)
+# FAIL: r9 was never observed written (observed value 0x00000000)
+# FAIL: r10 was never observed written (observed value 0x00000000)
+# FAIL: r11 was never observed written (observed value 0x00000000)
+# FAIL: r12 was never observed written (observed value 0x00000000)
+# FAIL: r13 was never observed written (observed value 0x00000000)
+# FAIL: r14 was never observed written (observed value 0x00000000)
+# FAIL: r15 was never observed written (observed value 0x00000000)
+# FAIL: r16 was never observed written (observed value 0x00000000)
+# FAIL: r17 was never observed written (observed value 0x00000000)
+# FAIL: r18 was never observed written (observed value 0x00000000)
+# FAIL: r19 was never observed written (observed value 0x00000000)
+# FAIL: r20 was never observed written (observed value 0x00000000)
+# FAIL: r21 was never observed written (observed value 0x00000000)
+# FAIL: r22 was never observed written (observed value 0x00000000)
+# FAIL: r23 was never observed written (observed value 0x00000000)
+# FAIL: r24 was never observed written (observed value 0x00000000)
+# FAIL: r25 was never observed written (observed value 0x00000000)
+# FAIL: r26 was never observed written (observed value 0x00000000)
+# FAIL: r27 was never observed written (observed value 0x00000000)
+# FAIL: r28 expected 0x00000004 observed 0x00000001
+# FAIL: r29 was never observed written (observed value 0x00000000)
+# FAIL: r30 was never observed written (observed value 0x00000000)
+# FAIL: r31 expected 0x00000002 observed 0x00000063
+# FAIL: MEM[99] was never written (observed 0xdeadbeef)
+# FAIL: MEM[100] was never written (observed 0xdeadbeef)
+# FAIL: MEM[101] was never written (observed 0xdeadbeef)
+# FAIL: MEM[102] was never written (observed 0xdeadbeef)
+# FAIL: MEM[103] was never written (observed 0xdeadbeef)
+# FAIL: MEM[105] was never written (observed 0xdeadbeef)
+# FAIL: MEM[107] was never written (observed 0xdeadbeef)
+# FAIL: MEM[111] was never written (observed 0xdeadbeef)
