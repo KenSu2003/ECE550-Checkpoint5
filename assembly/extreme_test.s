@@ -1,3 +1,8 @@
+# extreme_test.s
+# Derived from user's extreme_test.s (base file). This version adds full J-type coverage:
+# setx, bex, jal, jr, and j — combined with the original blocks that test ALU, shifts, lw/sw, overflow, branches, etc.
+# Original base file: extreme_test.s. :contentReference[oaicite:1]{index=1}
+
 nop
 
 # Block A: Initialize registers (addresses 0..4)
@@ -35,93 +40,126 @@ add  $21, $20, $20       # $21 = $20 + $20 => 0x80000000 (signed overflow)
 # After this ADD, rstatus should be set to 1 in $30 (exception write)
 
 # Block G: addi overflow (addresses 19..22)
-# Create value close to INT_MAX:
-#  1) $28 = 32767
-#  2) $28 <<= 16 -> 32767 << 16 = 0x7FFF0000
-#  3) addi $28, $28, 65535 -> 0x7FFFFFFF (INT_MAX)
-#  4) addi $28, $28, 1 -> overflow to 0x80000000 -> rstatus = 2
 addi $28, $0, 32767      # $28 = 32767
 sll  $28, $28, 16        # $28 <<= 16 => 0x7FFF0000
-addi $28, $28, 65535     # $28 = 0x7FFF0000 + 65535 => 0x7FFFFFFF (INT_MAX)
+addi $28, $28, 65535     # -> 0x7FFFFFFF (INT_MAX)
 addi $28, $28, 1         # overflow -> $28 becomes 0x80000000 and rstatus=2 in $30
 
 # Block H: sub overflow (addresses 23..25)
-# Create $29 = 1 << 31 = 0x80000000 (most-negative)
 addi $29, $0, 1          # $29 = 1
 sll  $29, $29, 31        # $29 = 1 << 31 = 0x80000000 (signed MIN)
-# Now compute $23 = $29 - $12  => 0x80000000 - 1 => 0x7FFFFFFF -> signed overflow
 sub  $23, $29, $12       # causes overflow -> rstatus = 3 in $30
 
 # Block I: Synthetic mini-program (addresses 26..33)
-# compute idx = $1 + 4 => put 999 at MEM[$5 + idx]
 addi $16, $1, 4          # $16 = $1 + 4   ; idx = 11
 addi $17, $0, 999        # $17 = 999      ; value to store
 sw   $17, 11($5)         # MEM[$5 + 11] = 999
 lw   $18, 11($5)         # $18 = MEM[$5 + 11] => 999
 add  $19, $18, $6        # $19 = $18 + $6  => 999 + 20 = 1019
 
-# Halt (fill rest with zeros or NOP-equivalent if assembler supports)
-# (If your assembler has a 'halt' or 'nop', you can place it; otherwise fill remaining imem with zeros.)
-
 # --- ADDI edge cases (covers sign-extension & bounds) ---
-# Large positive immediate (max 17-bit = +65535)
-addi $24, $0, 65535       # $24 = 65535  (boundary +)
-
-# Large negative immediate (min 17-bit = -65536)
-addi $25, $0, -65536      # $25 = -65536 (boundary -)
+addi $24, $0, 65535       # $24 = 65535
+addi $25, $0, -65536      # $25 = -65536
 
 # Use addi as address calculation for lw/sw
-# store $1 into MEM[$5 + 0] and MEM[$5 - 1] (negative offset)
 sw   $1, 0($5)            # MEM[$5 + 0] = $1 (7)
 sw   $1, -1($5)           # MEM[$5 - 1] = $1 (tests negative offset)
 lw   $26, 0($5)           # $26 = MEM[$5 + 0] -> should be 7
 lw   $27, -1($5)          # $27 = MEM[$5 - 1] -> should be 7
 
 # --- LW/SW permutations (cover different rd/rs combinations) ---
-# Put value in $3 and store it using sw (rd-case)
 sw   $3, 5($5)            # MEM[$5 + 5] = $3 (-5)
 lw   $14, 5($5)           # $14 = MEM[$5 + 5] -> should be -5
 
-# Use another store where rd != rt
 addi $2, $0, 21           # $2 = 21  (ensure $2 changed)
 sw   $2, 7($5)            # MEM[$5 + 7] = $2 (21)
 lw   $8, 7($5)            # $8 = 21
 
-# Write to multiple memory addresses and read them back
 sw   $6, 1($5)            # MEM[$5 + 1] = 20
 sw   $9, 2($5)            # MEM[$5 + 2] = ($9 from earlier)
 lw   $21, 1($5)           # $21 = 20
 lw   $22, 2($5)           # $22 = $9
 
 # --- Overflow extra edgecases (ensure rstatus write and override) ---
-# Make values that will overflow via addi using immediate boundary
-# Prepare: set $31 (tmp) = 0x7FFF0000 (like earlier), then addi by +65535 -> INT_MAX, then addi +1 -> overflow
 addi $31, $0, 32767       # $31 = 32767
 sll  $31, $31, 16         # $31 <<=16 -> 0x7FFF0000
-addi $31, $31, 65535      # $31 = 0x7FFFFFFF (INT_MAX)
-addi $31, $31, 1          # overflow -> $30 should be set to 2 (check rstatus immed after this)
-
+addi $31, $31, 65535      # $31 = 0x7FFFFFFF
+addi $31, $31, 1          # overflow -> $30 should be set to 2
 
 # --------------------
-# Block J: Branch tests (BNE, BLT) - no BEQ, no J-type used
+# Block J: Branch tests (BNE, BLT)
 # --------------------
-
-# BNE test: if $1 != $2, branch to label branch_bne_pass
 addi $1,  $0,  7         # $1 = 7
 addi $2,  $0,  8         # $2 = 8
 bne  $1,  $2, branch_bne_pass
-    addi $30, $0, 1      # should be skipped if BNE works
+addi $30, $0, 1          # should be skipped if BNE works
 branch_bne_pass:
-    addi $31, $0, 2      # marker for BNE path taken
+addi $31, $0, 2          # marker for BNE path taken
 
-# BLT test (signed): if $3 < $4, branch to label branch_blt_pass
 addi $3,  $0,  -2        # $3 = -2
 addi $4,  $0,   3        # $4 = 3
 blt  $3,  $4, branch_blt_pass
-    addi $29, $0, 3      # should be skipped if BLT works
+addi $29, $0, 3          # should be skipped if BLT works
 branch_blt_pass:
-    addi $28, $0, 4      # marker for BLT path taken
+addi $28, $0, 4          # marker for BLT path taken
 
-# End of branch tests
+# --------------------
+# Block K: Jump & Status tests (NEW)
+#   - Tests setx / bex (status + conditional jump)
+#   - Tests jal / jr (call/return)
+#   - Tests j (unconditional jump)
+# --------------------
 
+# 1) Test setx + bex: set status, then bex should jump when rstatus != 0
+setx  0x0000002A         # $30 (rstatus) = 0x2A (42)  [setx takes a JI immediate; assembler should accept hex or decimal]
+bex   SKIP_BEX           # if rstatus != 0 then PC = SKIP_BEX
+# If bex fails, this addi will execute; it should be skipped
+addi  $1, $0, 99         # skipped if bex worked
+SKIP_BEX:
+addi  $1, $0, 11         # $1 = 11  (marker that bex jumped)
+
+# 2) Test jal / jr: call a function that modifies registers, then jr $31 returns
+#    We place the call so that the saved return address (PC + 1) is well-defined by labels.
+jal CALLER_FUNC          # $31 = PC+1 ; jump to CALLER_FUNC
+# After returning from jr $31, the next instruction executed should be here:
+addi  $5, $0, 0          # (placeholder) ensure location after return - we'll overwrite with meaningful op later
+# use an unconditional jump to skip over a stub block
+j     AFTER_STUB
+
+# Stub area that should be skipped by j above
+STUB:
+addi $5, $0, 99          # should be skipped by j
+j     CONTINUE_SKIPPED
+
+AFTER_STUB:
+# continue normal flow after returning from CALLER_FUNC
+addi $6, $0, 6           # set $6 to 6 as a marker (will overwrite earlier $6 value; this checks return flow)
+
+# CALLER_FUNC: do some work then return using jr $31
+CALLER_FUNC:
+addi $2, $0, 2           # $2 = 2 (local)
+addi $3, $0, -5          # $3 = -5 (re-assert)
+addi $4, $0, 4           # $4 = 4
+# set a marker register inside function
+addi $7, $0, 77          # $7 = 77
+jr   $31                 # return to saved PC in $31
+
+CONTINUE_SKIPPED:
+# 3) Test unconditional j: jump ahead to J_TARGET
+j     J_TARGET
+# code here should be skipped
+addi  $8, $0, 99         # skipped by j
+
+J_TARGET:
+addi  $8, $0, 8          # $8 = 8  (marker that j worked)
+
+# 4) Test setx/bex interaction with zero: setx to 0 then bex must NOT jump
+setx 0                   # clear rstatus
+bex  SKIP_NO_JUMP        # should NOT jump since rstatus == 0
+addi $9, $0, 99          # should be executed if bex does NOT jump
+SKIP_NO_JUMP:
+# keep $9 set to 99 as marker
+addi $9, $0, 99
+
+# End of program: a final nop
 nop
