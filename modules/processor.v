@@ -129,27 +129,26 @@ module processor(
         Now we are going to implementing it.
         The address would come from the PC_MUX in var branch_target
      */
-    wire [11:0] branch_target;
 
-
-    // ************** PC Mux **************
-    wire [11:0] branch_address;
-    mux_2_1 pc_mux (
-        .out(branch_address),
+    // ************** Branch Mux **************
+    wire [11:0] branch_or_pc_plus_1, branch_target;
+    mux_2_1 branch_mux (
+        .out(branch_or_pc_plus_1),
         .a(pc_plus_1),
         .b(branch_target),
-        .s(pc_src)
+        .s(pc_src)           // 1 if bne/blt is taken
     );
 
     // ************** Jump Mux **************
-    wire [11:0] jump_target;
-    wire isJumpTarget;
+    wire [11:0] jump_target;   
+    wire j_func;
     mux_2_1 jump_mux (
         .out(pc_next),
-        .a(branch_address),
+        .a(branch_or_pc_plus_1),
         .b(jump_target),
-        .s(isJumpTarget)
+        .s(j_func)            // 1 if 'j' instruction
     );
+
 
     // ************** Instruction Memory **************
     /* 
@@ -168,8 +167,10 @@ module processor(
         end
     endgenerate
 
+
     // ++++++++++++++ PC -> Read Address ++++++++++++++
     assign address_imem = pc;
+
 
     // Latch fetched instruction on processor clock for stable decode 
     /*
@@ -187,7 +188,6 @@ module processor(
             );
         end
     endgenerate
-
 
     /* ———————————————————————————————————————————————————— ID stage ———————————————————————————————————————————————————— */
     wire [4:0] opcode;
@@ -219,7 +219,6 @@ module processor(
      */
     assign sign_extended = {{15{immediate[16]}}, immediate};
 
-
     // ************** Branch Address ALU **************
     /*
         In the project because we are counting in words we don't 
@@ -238,9 +237,7 @@ module processor(
         .overflow()
     );
 
-    // ++++++++++++++ Decode I-type ++++++++++++++
-    // wire [26:0] jump_target;             // declared above
-    // we are going to use the lsb 12 bits
+    // ++++++++++++++ Decode J-type ++++++++++++++
     assign jump_target = instr[11:0];
 
 
@@ -315,15 +312,8 @@ module processor(
     wire isBranch;
     or checkBranch (isBranch, bne_func, blt_func);
 
-
-    // JI-Type
-    wire j_func, jal_func, bex_func, jr_func;
-    and j_check (j_func, ~opcode[4], ~opcode[3], ~opcode[2], ~opcode[1], opcode[0]);        // j : 00001
-    and jal_check (jal_func, ~opcode[4], ~opcode[3], ~opcode[2], opcode[1], opcode[0]);     // jal : 00011
-    and bex_check (bex_func, opcode[4], ~opcode[3], opcode[2], opcode[1], ~opcode[0]);      // bex : 10110
-    and jr_check (jr_func, ~opcode[4], ~opcode[3], opcode[2], ~opcode[1], ~opcode[0]);      // jr : 00100
-    /* isJumpTarget moved below for getting the rstats ($30) */
-
+    // J-type
+    and j_check (j_func, ~opcode[4], ~opcode[3], ~opcode[2], ~opcode[1], opcode[0]);        // j: opcode == 00001
 
 
     // Check which operation to use
@@ -425,17 +415,6 @@ module processor(
     // Signal for r30 if there is an overflow
     wire overflow_write_rstatus;
     assign overflow_write_rstatus = r_add_overflow | i_addi_overflow | r_sub_overflow;
-
-
-    // Check if $rstatus != 0
-    wire rd_not_zero, bex_signal;
-    xor(rd_not_zero, rstatus, 2'd0);     // if != -> true
-    and(bex_signal, rd_not_zero, bex_func);  // allow PC = T
-
-    // Check if it's a jump to Target signal (j, jal, bex)
-    // wire isJumpTarget;   // declared above
-    or checkJumpTarget (isJumpTarget, j_func, jal_func, bex_signal);
-    
 
 
     /* —————————————————————————— MEM stage —————————————————————————— */

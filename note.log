@@ -1,3 +1,10 @@
 extreme_test no long works
 
 branch uses instr and imem = CLOCK0
+
+the branch_compelte.s test will end with a 
+r3 <= 0x00000007
+since we did not have jump to skip it
+that's why we have the branch—jump.s file
+
+alui cannot do signed comaprison

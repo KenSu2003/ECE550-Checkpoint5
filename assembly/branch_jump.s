@@ -1,15 +1,21 @@
-# branch_jump_combined.s -- use jal + internal branch + jr($31)
-addi $1, $0, 7        # $1 = 7
-addi $2, $0, 8        # $2 = 8
-jal FUNC              # $31 = return addr (PC+1), jump to FUNC
-addi $5, $0, 9        # executed after returning (marker)
+# branch_jump.s -- simple branch coverage (bne and blt, taken/not-taken)
 
-nop
+# --- BNE CHECK (Not Taken Case: $1 = $2) ---
+addi $1, $0, 5       # $1 = 5
+addi $2, $0, 5       # $2 = 5
+bne  $1, $2, bne_taken
+addi $3, $0, 99         # NOT TAKEN PATH
+j    next_test          # UNCONDITIONAL JUMP to skip the taken path
 
-FUNC:
-addi $3, $0, -5       # $3 = -5
-blt  $3, $1, Lblt     # -5 < 7 -> branch taken to Lblt
-addi $28, $0, 99      # skipped if branch taken
-Lblt:
-addi $28, $0, 4       # $28 = 4  (marker)
-jr   $31              # return (PC <- $31)
+bne_taken:
+addi $3, $0, 7       # SKIPPED by the jump above since $1 = $2.
+
+# --- BLT CHECK (Taken Case: $4 < $3) ---
+next_test:
+addi $4, $0, 2      # $4 = 2
+addi $6, $0, 7      # $6 = 7
+blt  $4, $3, blt_pass
+addi $5, $0, 0       #  SKIPPED
+
+blt_pass:
+addi $5, $0, 3       # $5 = 3
