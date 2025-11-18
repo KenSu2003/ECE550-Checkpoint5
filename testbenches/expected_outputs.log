@@ -51,7 +51,8 @@ expected_reg[6]  = 32'h00000007;    // $6 = 7
 expected_reg[7]  = 32'h0000000A;    // $7 = 10
 expected_reg[8]  = 32'h0000000B;    // $8 = 11 (result from subroutine)
 expected_reg[9]  = 32'h0000000B;    // $9 = 11 (copied from $8)
-expected_reg[31] = 32'h00000013; // $ra = 19 (PC+1 from jal at PC=18)
+expected_reg[30] = 32'h0000007B;    // $rstatus = 123 (from setx 123)
+expected_reg[31] = 32'h00000013;    // $ra = 19 (PC+1 from jal at PC=18)
 
 
 // jump_suite.s expected register values

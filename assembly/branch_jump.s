@@ -1,4 +1,4 @@
-# branch_jump.s -- simple branch coverage (bne, blt, and jal)
+# branch_jump.s -- simple branch coverage (bne, blt, jal, setx)
 
 # --- BNE CHECK (Not Taken Case: $1 = $2) ---
 addi $1, $0, 5
@@ -28,12 +28,17 @@ jal  my_subroutine
 
 after_call:
 add  $9, $8, $0
-j    done
+j    setx_test       # Jump to setx test
 
 # --- Subroutine Definition ---
 my_subroutine:
 addi $8, $7, 1
 jr   $ra
 
+# --- SETX CHECK ---
+setx_test:
+setx 27           # $rstatus ($r30) = 123 [cite: 95, 216]
+j    done
+
 done:
-nop
+nop                # Program terminates

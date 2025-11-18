@@ -131,22 +131,22 @@ module processor(
         The address would come from the PC_MUX in var branch_target
      */
 
+
     // ************** Branch Mux **************
     wire [11:0] branch_or_pc_plus_1, branch_target;
     mux_2_1 branch_mux (
         .out(branch_or_pc_plus_1),
         .a(pc_plus_1),
         .b(branch_target),
-        .s(pc_src)           // 1 if bne/blt is taken
+        .s(pc_src)              // 1 if bne/blt is taken
     );
     
     // ************** J/JAL/JR Muxes **************
-    // *** See ID/EX stage for jr_func, is_j_or_jal ***
-    // *** See ID stage for j_or_jal_target ***
+    // jr_func, is_j_or_jal : ID/EX Stage
+    // j_or_jal_target : ID Stage
     
-    wire [11:0] j_or_jal_target; // Defined in ID stage
-    wire [11:0] jump_mux_out;
-    wire is_j_or_jal; // Defined in EX stage
+    wire [11:0] j_or_jal_target, jump_mux_out;
+    wire is_j_or_jal;
     
     mux_2_1 jump_mux (
         .out(jump_mux_out),
@@ -155,18 +155,24 @@ module processor(
         .s(is_j_or_jal)
     );
     
-    wire jr_func; // Defined in EX stage
     
-    // New MUX for jr: Selects between (previous result) AND (Register Value)
+    // ************** jr mux **************
+    /*
+        Selects between (previous result) AND (Register Value)
+    */
+    wire jr_func;                               // Assigned in EX stage
+
     mux_2_1 jr_mux (
         .out(pc_next),
         .a(jump_mux_out),
-        .b(data_readRegA[11:0]), // Value from RegFile (e.g., $ra)
-        .s(jr_func)             // Select if jr
+        .b(data_readRegA[11:0]),    // Value from RegFile (e.g., $ra)
+        .s(jr_func)                 // Select if jr
     );
 
+
     // ************** Instruction Memory **************
-    /* Used 32-DFFEs to store each bit of the instruction.
+    /* 
+        Used 32-DFFEs to store each bit of the instruction.
     */ 
     genvar i;
     generate
@@ -185,14 +191,7 @@ module processor(
 
     // ++++++++++++++ PC -> Read Address ++++++++++++++
     assign address_imem = pc;
-    
-    // Latch fetched instruction on processor clock for stable decode 
-    /*
-        THIS PART IS VERY IMPORTANT FOR TIMING AND FORWARDING THE LOADED DATA
-        
-        *** FIX: Removed DFFE bank for `instr` to prevent one-cycle delay ***
-        *** This fixes the PC update logic and resulting data hazards ***
-    */
+
     wire [31:0] instr;
     assign instr = q_imem;
 
@@ -303,8 +302,6 @@ module processor(
         lw $rd, N($rs)	        01000
        --------------------------------------------------------------------- */
     
-    
-  
     // R-Type , the ([xxxxx])
     wire add_func, sub_func, and_func, or_func, sll_func, sra_func;
     and add_check (add_func, ~alu_op[4], ~alu_op[3], ~alu_op[2], ~alu_op[1], ~alu_op[0]);
@@ -335,7 +332,9 @@ module processor(
     and jr_check (jr_func, ~opcode[4], ~opcode[3], opcode[2], ~opcode[1], ~opcode[0]);   // jr: opcode == 00100
     
     or is_j_or_jal_or (is_j_or_jal, j_func, jal_func); // Used in IF stage MUX
-    
+
+    and setx_check (setx_func, opcode[4], ~opcode[3], opcode[2], ~opcode[1], opcode[0]); // setx: opcode == 10101
+
     // Check which operation to use
     wire add_op, sub_op, and_op, or_op, sll_op, sra_op;
     wire [4:0] alu_control;
@@ -403,10 +402,8 @@ module processor(
     wire branch_bne, branch_blt;
     and bne_and (branch_bne, alu_isNotEqual, bne_func);
     and blt_and (branch_blt, alu_isLessThan, blt_func);
-    or(confirm_branch, branch_bne, branch_blt);
-    // branch confirmation
-    and branch_and (pc_src, isBranch, confirm_branch); // update PC_SRC
-
+    or(confirm_branch, branch_bne, branch_blt);             // branch confirmation
+    and branch_and (pc_src, isBranch, confirm_branch);      // update PC_SRC
 
 
     /* ---------------------------------------------------------------------
@@ -463,14 +460,18 @@ module processor(
         .s(mem_to_reg)                // Select: 0=ALU result, 1=memory data
     );
     
-    /* Output Register 
+    /* Output Register (Priority top-down) [overflow > SETX > JAL > normal]
         - Overflow case: write to register 30 (rstatus register for exception handling)
+        - SETX case: write to register 30 ($r30 = T)
         - JAL case: write to register 31 ($ra)
         - Normal case: write to destination register (rd)
         NOTE: Exceptions take precedent when writing to $r30.
     */
     wire [4:0] final_write_reg;
-    assign final_write_reg  = overflow_write_rstatus ? 5'd30 : (jal_func ? 5'd31 : rd);
+
+    wire is_setx_or_overflow;
+    or setx_overflow_or (is_setx_or_overflow, overflow_write_rstatus, setx_func);
+    assign final_write_reg  = is_setx_or_overflow ? 5'd30 : (jal_func ? 5'd31 : rd);
     
     /*
         Write Permission
@@ -478,13 +479,10 @@ module processor(
         OR 
         - when we have an overflow and need to write status to r30
         OR
-        - when we have a jal and need to write PC+1 to $ra
-        
-        *** FIX: Added jal_func logic ***
+        - when we have a jal and need to write PC+1 to $ra        
     */
     wire final_write_enable;
-    or final_write_or (final_write_enable, reg_write, overflow_write_rstatus, jal_func);
-
+    or final_write_or (final_write_enable, reg_write, overflow_write_rstatus, jal_func, setx_func);
 
     /* DO NOT FORGET THIS PART!
         Check if we're trying to write to register 0
@@ -502,8 +500,18 @@ module processor(
     // Tell the register file which register to write to
     assign ctrl_writeReg = final_write_reg;
     
-    // Choose the final data to write
-    assign data_writeReg = overflow_write_rstatus ? rstatus : (jal_func ? pc_alu_result : mem_to_reg_data);
-
+    // ++++++++++++++ Choose the final data to write ++++++++++++++
+    /*
+        If overflow, write rstatus. 
+        Else if setx, write T. 
+        Else if jal, write PC+1. 
+        Else, write normal data.
+    */
+    wire [31:0] target;
+    assign target = {5'b0, instr[26:0]};       // Zero-extend T (instr[26:0]) to 32 bits
+    
+    assign data_writeReg = overflow_write_rstatus ? rstatus :
+                           (setx_func ? target :
+                           (jal_func ? pc_alu_result : mem_to_reg_data));
 
 endmodule
