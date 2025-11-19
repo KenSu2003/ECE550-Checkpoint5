@@ -1,16 +1,122 @@
-// Latch fetched instruction on processor clock for stable decode
-genvar j; // Use 'j' to avoid conflict with the existing 'i'
-generate
-    for (j = 0; j < 32; j = j + 1) begin : instr_reg_gen
-        dffe_ref instr_dffe_j (
-            .q(instr[j]),
-            .d(q_imem[j]),
-            .clk(clock),
-            .en(1'b1),
-            .clr(reset)
-        );
-    end
-endgenerate
+# Simulation starting...
+# Reset released, starting program execution
+# Time                90000: PC=1 Instr=28800002
+#   Write observed: REG r1 <= 0x00000001
+# [TB][90000] Reg write observed: r1 <= 0x00000001
+# Time               110000: PC=2 Instr=10440001
+#   Write observed: REG r2 <= 0x00000002
+# [TB][110000] Reg write observed: r2 <= 0x00000002
+# Time               130000: PC=3 Instr=28c00063
+# Time               150000: PC=5 Instr=29000004
+# Time               170000: PC=6 Instr=00000000
+#   Write observed: REG r4 <= 0x00000004
+# [TB][170000] Reg write observed: r4 <= 0x00000004
+# Time               190000: PC=7 Instr=2941ffff
+# Time               210000: PC=8 Instr=31420001
+#   Write observed: REG r5 <= 0xffffffff
+# [TB][210000] Reg write observed: r5 <= 0xffffffff
+# Time               230000: PC=9 Instr=2981ffff
+# Time               250000: PC=10 Instr=00000000
+#   Write observed: REG r6 <= 0xffffffff
+# [TB][250000] Reg write observed: r6 <= 0xffffffff
+# Time               270000: PC=11 Instr=29c00007
+# Time               290000: PC=12 Instr=00000000
+#   Write observed: REG r7 <= 0x00000007
+# [TB][290000] Reg write observed: r7 <= 0x00000007
+# Time               310000: PC=13 Instr=2a000001
+# Time               330000: PC=14 Instr=2a400001
+#   Write observed: REG r8 <= 0x00000001
+# [TB][330000] Reg write observed: r8 <= 0x00000001
+# Time               350000: PC=15 Instr=2a800063
+#   Write observed: REG r9 <= 0x00000001
+# [TB][350000] Reg write observed: r9 <= 0x00000001
+# Time               370000: PC=16 Instr=10440001
+#   Write observed: REG r10 <= 0x00000063
+# [TB][370000] Reg write observed: r10 <= 0x00000063
+# Time               390000: PC=17 Instr=2a800001
+# Time               410000: PC=19 Instr=00000000
+# Time               430000: PC=20 Instr=00000000
+# Time               450000: PC=21 Instr=2ac00002
+# Time               470000: PC=22 Instr=2b000001
+#   Write observed: REG r11 <= 0x00000002
+# [TB][470000] Reg write observed: r11 <= 0x00000002
+# Time               490000: PC=23 Instr=2b400063
+#   Write observed: REG r12 <= 0x00000001
+# [TB][490000] Reg write observed: r12 <= 0x00000001
+# Time               510000: PC=24 Instr=30440001
+#   Write observed: REG r13 <= 0x00000063
+# [TB][510000] Reg write observed: r13 <= 0x00000063
+# Time               530000: PC=25 Instr=2b400001
+# Time               550000: PC=26 Instr=00000000
+#   Write observed: REG r13 <= 0x00000001
+# [TB][550000] Reg write observed: r13 <= 0x00000001
 
 
-// fixed the i_mem swap issue
+# --- Running automated checks ---
+# Checking registers 1..31 and selected memory locations...
+# PASS: r1 == 0x00000001
+# PASS: r2 == 0x00000002
+# FAIL: r3 was never observed written (observed value 0x00000000)
+# PASS: r4 == 0x00000004
+# PASS: r5 == 0xffffffff
+# FAIL: r6 expected 0x00000000 observed 0xffffffff
+# PASS: r7 == 0x00000007
+# PASS: r8 == 0x00000001
+# PASS: r9 == 0x00000001
+# FAIL: r10 expected 0x00000001 observed 0x00000063
+# PASS: r11 == 0x00000002
+# PASS: r12 == 0x00000001
+# PASS: r13 == 0x00000001
+
+
+
+
+
+Few notes from the wave form
+
+Problem 1:
+
+0x10440001 keeps repeated twice and I do not see the blt
+
+    -- bne  $1, $2, bne_true
+
+0003 : 00010000010001000000000000000001;
+
+
+
+Problem 2. 
+
+# Time               390000: PC=17 Instr=2a800001
+
+This line was executed
+
+    -- addi $10, $0, 1         # $10 = 1
+
+0019 : 00101010100000000000000000000001;
+
+yet $r10 was not written.
+
+
+Problem 3
+29C00063 was not executed
+    -- addi $7, $0, 99       # $7 = 99 (should later be changed to 7)
+0009 : 00101001110000000000000001100011;
+# Time               190000: PC=7 Instr=2941ffff
+# Time               210000: PC=8 Instr=31420001
+
+
+Problem 4
+Because of problem 3
+it cause this to run
+addi $6, $0, -1     # Skipped
+
+
+problem 5
+# Time               350000: PC=15 Instr=2a800063
+#   Write observed: REG r9 <= 0x00000001
+
+
+that instruction should be 
+    -- addi $10, $0, 99         # $10 = 99 (should later be changed to 1)
+
+
