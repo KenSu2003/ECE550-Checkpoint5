@@ -136,8 +136,8 @@ module processor(
         THIS PART IS VERY IMPORTANT FOR TIMING AND FORWARDING THE LOADED DATA
     */
     wire [31:0] instr, instr_input;
-    wire branch_src;
-    assign instr_input = branch_src ? 32'b0 : q_imem;
+    wire branch_src, jump_src;
+    assign instr_input = (branch_src | jump_src) ? 32'b0 : q_imem;  // Bubble to delay by one cycle
 
     generate
         for (i = 0; i < 32; i = i + 1) begin : instr_reg_gen
@@ -160,6 +160,7 @@ module processor(
     wire [4:0] alu_op;
     wire [16:0] immediate;
     wire [31:0] sign_extended;          // NOTE: ZEROES are just included in the sign-extended
+    wire [26:0] target;
 
     // Universal
     assign opcode    = instr[31:27];    // main opcode
@@ -170,6 +171,7 @@ module processor(
     assign alu_op    = instr[6:2];      // r-type operations
     assign immediate = instr[16:0];     // Immediate
     assign sign_extended = {{15{immediate[16]}}, immediate};    // For calculating brach and the ALU in EX stage
+    assign target    = instr[26:0];
     
     /* -------------------------------------------------------------------------------------
         NOTE: These types are later used to determine what operation the ALU is going to execute.
@@ -205,7 +207,17 @@ module processor(
     and bne_check (bne_type, ~opcode[4], ~opcode[3], ~opcode[2], opcode[1], ~opcode[0]);        // sw: opcode == 00010
     and blt_check (blt_type, ~opcode[4], ~opcode[3], opcode[2], opcode[1], ~opcode[0]);         // sw: opcode == 00110
 
-   
+    
+    // +++++++++++++++++ J-Type Decode +++++++++++++++++
+    wire j_type, jal_type, jr_type, bex_type, setx_type;
+
+    and j_check (j_type, ~opcode[4], ~opcode[3], ~opcode[2], ~opcode[1], opcode[0]);        // j: 00001
+    and jal_check (jal_type, ~opcode[4], ~opcode[3], ~opcode[2], opcode[1], opcode[0]);     // jal: 00011
+    and jr_check (jr_type, ~opcode[4], ~opcode[3], opcode[2], ~opcode[1], ~opcode[0]);      // jr: 00100
+    and bex_check (bex_type, opcode[4], ~opcode[3], opcode[2], opcode[1], ~opcode[0]);      // bex: 10110
+    and setx_check (setx_type, opcode[4], ~opcode[3], opcode[2], ~opcode[1], opcode[0]);    // setx: 10101
+
+
     // ++++++++++++++++++++++++++ r/w Permissions ++++++++++++++++++++++++++
     wire mem_read, mem_to_reg, mem_write, alu_src, reg_write;
 
@@ -225,10 +237,7 @@ module processor(
         rt : else
     --------------------------------------------------------------------- */
     assign ctrl_readRegA = (bne_type | blt_type) ? rd : rs;
-    assign ctrl_readRegB = (bne_type | blt_type) ? rs :
-                        (sw_type ? rd : rt);
-
-    
+    assign ctrl_readRegB = (bne_type | blt_type) ? rs : (sw_type ? rd : rt);
 
     /* ——————————————————————————————————— End of ID ——————————————————————————————————— */
 
@@ -352,13 +361,25 @@ module processor(
     );
 
     // ***************** Branch Mux *****************     
+    wire [11:0] branch_address;
     mux_2_1 branch_mux (
-        .out(pc_next),
+        .out(branch_address),
         .a(pc_plus_1),
         .b(branch_target[11:0]),
         .s(branch_src)
     );
 
+
+    // ++++++++++++++++++++++++++ Calculate Jump ++++++++++++++++++++++++++
+    assign jump_src = j_type | jal_type;
+
+    // ***************** Jump Mux *****************     
+    mux_2_1 jump_mux (
+        .out(pc_next),
+        .a(branch_address),
+        .b(target),
+        .s(jump_src)
+    );
     /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ End of EX ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
 
 
@@ -432,5 +453,7 @@ module processor(
 
     // Choose the final data to write
     assign data_writeReg = overflow_write_rstatus ? rstatus : mem_to_reg_data;
+
+    /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ End of WB ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
 
 endmodule
