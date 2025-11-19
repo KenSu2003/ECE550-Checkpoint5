@@ -41,6 +41,6 @@ The Write-Back stage selects the final data to write to the register file.
 * **IMEM Settings:** The Instruction Memory IP was generated with **UNREGISTERED** outputs ("q"). This configuration is required to ensure the instruction data is available within the single clock cycle immediately after the address stabilizes.
 
 ## Citations / References
-- [cite_start]Project specification and ISA details referenced from "Checkpoint 5 - Full Processor.pdf" [cite: 1-100].
+- Project specification and ISA details referenced from "Checkpoint 5 - Full Processor.pdf"
 - 4-bit CLA design referenced from Wikipedia.
-- Single-cycle processor concepts referenced from ECE 550 course lectures.
+- Single-cycle processor concepts referenced from ECE 550 – Lecture 8: Slide 17.
