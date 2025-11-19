@@ -37,20 +37,23 @@ jr   $ra
 
 # --- SETX / BEX (Taken Case) ---
 setx_test:
-setx 123           # $rstatus ($r30) = 123
-bex  bex_taken_path  # Branch SHOULD be taken (123 != 0)
-addi $10, $0, 55     # NOT TAKEN PATH. $10 should remain 0
+setx 123                # $rstatus ($r30) = 123
+addi $10, $0, 1         # $10 = 1
+bex  bex_taken_path     # Branch SHOULD be taken (123 != 0)
+addi $10, $0, 55        # NOT TAKEN PATH. $10 should remain 1
 j    bex_not_taken_test
 
 bex_taken_path:
-addi $11, $0, 77     # TAKEN PATH. $11 = 77
+addi $11, $0, 1         # TAKEN PATH. $11 = 1
 j    bex_not_taken_test
 
 # --- BEX (Not Taken Case) ---
 bex_not_taken_test:
-setx 0             # $rstatus ($r30) = 0
+setx 0               # $rstatus ($r30) = 0
+addi $12, $0, -1     # NOT TAKEN PATH. $12 = -1 f(should later be changed to 1)
+addi $13, $0, 1     # $13 should remain 1
 bex  bex_fail_path   # Branch SHOULD NOT be taken (0 == 0)
-addi $12, $0, 88     # NOT TAKEN PATH. $12 = 88
+addi $12, $0, 1     # $12 = 1
 j    done
 
 bex_fail_path:

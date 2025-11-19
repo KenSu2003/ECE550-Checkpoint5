@@ -151,21 +151,6 @@ module processor(
         end
     endgenerate
 
-
-    wire [11:0] pc_plus_1_latched;
-    
-    generate
-        for (i = 0; i < 12; i = i + 1) begin : pc_latch_gen
-            dffe_ref pc_latch_dffe (
-                .q(pc_plus_1_latched[i]), // Output to use in EX stage
-                .d(pc_plus_1[i]),         // Input from current PC
-                .clk(clock),
-                .en(1'b1),
-                .clr(reset)
-            );
-        end
-    endgenerate
-
     /* ——————————————————————————————————— End of IF ——————————————————————————————————— */
 
 
@@ -246,12 +231,14 @@ module processor(
     // ++++++++++++++++++++++++++ Port Selection ++++++++++++++++++++++++++
     /* ---------------------------------------------------------------------
     // Regfile read ports:
-    ctrl_readRegA = rs              // Right term
+    ctrl_readRegA =                 // Right term
+        rd : jr
+        rs : else
     ctrl_readRegB =                 // Left term
         rd : sw , bne , blt
         rt : else
     --------------------------------------------------------------------- */
-    assign ctrl_readRegA = (bne_type | blt_type) ? rd : rs;
+    assign ctrl_readRegA = (bne_type | blt_type | jr_type) ? rd : rs;
     assign ctrl_readRegB = (bne_type | blt_type) ? rs : (sw_type ? rd : rt);
 
     /* ——————————————————————————————————— End of ID ——————————————————————————————————— */
@@ -392,12 +379,14 @@ module processor(
     wire r30_not_zero = | data_readRegA;
     assign jump_src = j_type | jal_type | jr_type | (bex_type & r30_not_zero);
     
+    wire [11:0] final_jump_target;
+    assign final_jump_target = jr_type ? data_readRegA[11:0] : target[11:0];        // PC = $rd
 
     // ***************** Jump Mux *****************     
     mux_2_1 jump_mux (
         .out(pc_next),
         .a(branch_address),
-        .b(target),
+        .b(final_jump_target),
         .s(jump_src)
     );
     /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ End of EX ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
@@ -475,7 +464,7 @@ module processor(
 
     // Choose the final data to write
     assign data_writeReg = setx_type ? {5'b0, target} : 
-                           jal_type ? {20'b0, pc_plus_1_latched} :
+                           jal_type ? {20'b0, pc_plus_1} : 
                            overflow_write_rstatus ? rstatus : 
                            mem_to_reg_data;
 
