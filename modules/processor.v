@@ -371,7 +371,12 @@ module processor(
 
 
     // ++++++++++++++++++++++++++ Calculate Jump ++++++++++++++++++++++++++
-    assign jump_src = j_type | jal_type;
+    /* ---------------------------------------------------------------------
+        bex — if ($rstatus != 0) PC = T
+       --------------------------------------------------------------------- */
+    wire r30_not_zero = | data_readRegA;
+    assign jump_src = j_type | jal_type | jr_type | (bex_type & r30_not_zero);
+    
 
     // ***************** Jump Mux *****************     
     mux_2_1 jump_mux (
@@ -420,7 +425,9 @@ module processor(
         NOTE: Exceptions take precedent when writing to $r30.
     */
     wire [4:0] final_write_reg;
-    assign final_write_reg  = overflow_write_rstatus ? 5'd30 : rd;
+    assign final_write_reg = jal_type ? 5'd31 : 
+                             (overflow_write_rstatus | setx_type) ? 5'd30 : 
+                             rd;
 
 
     /*
@@ -430,7 +437,7 @@ module processor(
         - when we have an overflow and need to write status to r30
     */
     wire final_write_enable;
-    assign final_write_enable = reg_write | overflow_write_rstatus;
+    assign final_write_enable = reg_write | overflow_write_rstatus | jal_type | setx_type;
 
 
     /*  DO NOT FORGET THIS PART!
@@ -452,7 +459,10 @@ module processor(
     
 
     // Choose the final data to write
-    assign data_writeReg = overflow_write_rstatus ? rstatus : mem_to_reg_data;
+    assign data_writeReg = setx_type ? {5'b0, target} : 
+                           jal_type ? {20'b0, pc_plus_1} : 
+                           overflow_write_rstatus ? rstatus : 
+                           mem_to_reg_data;
 
     /* ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ End of WB ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
 
